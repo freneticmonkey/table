@@ -1,0 +1,10 @@
+{"id":1,"name":"Steve","class_id":2,"paid":false}
+{"id":2,"name":"Caroline","class_id":2,"paid":true}
+{"id":3,"name":"Frank","class_id":1,"paid":true}
+{"id":4,"name":"Jacinta","class_id":3,"paid":false}
+{"id":5,"name":"Rupert","class_id":2,"paid":true}
+{"id":6,"name":"Guiseppe","class_id":1,"paid":true}
+{"id":7,"name":"Penny","class_id":3,"paid":false}
+{"id":8,"name":"Maria","class_id":3,"paid":false}
+{"id":9,"name":"Prudence","class_id":3,"paid":false}
+{"id":10,"name":"Ferdinand","class_id":3,"paid":false}
