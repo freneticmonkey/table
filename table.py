@@ -23,16 +23,20 @@ THE SOFTWARE.
 """
 
 # Python Includes
-import json, re, calendar
+import json, re, calendar, os
 from time import time
 from datetime import datetime
 from operator import itemgetter
 from collections import defaultdict
 
 # Package includes
-import sys
-sys.path.append('c:/python27/lib/site-packages')
-from prettytable import PrettyTable
+_prettytable = False
+try:
+	from prettytable import PrettyTable
+	_prettytable = True
+except Exception, e:
+	print "Unable to import prettytable. install using 'easy_install prettytable'"
+	print e.message
 
 class Table(object):
 	
@@ -42,31 +46,33 @@ class Table(object):
 		
 		if not input_file is '':
 			self.load(input_file)
-
 		self._reset()
 
-	def load(self, input_file):
+	def load(self, file_name):
 		self.data_format = {}
 		self.data = []
 		self.have_format = False
-		start = time()
-		with open(input_file, 'r') as f:
-			for line in f.readlines():
-				try:
-					row = json.loads(line)
-					self.data.append(row)
-					if not self.have_format:
-						for key, value in row.items():
-							self.data_format[key] = type(value).__name__
+		if os.path.isfile(file_name):
+			start = time()
+			with open(file_name, 'r') as f:
+				for line in f.readlines():
+					try:
+						row = json.loads(line)
+						self.data.append(row)
+						if not self.have_format:
+							for key, value in row.items():
+								self.data_format[key] = type(value).__name__
 
-				except Exception, e:
-					print "Load failed: " + e.message
-					print "Data: " + line
-					self.data = []
-					return
+					except Exception, e:
+						print "Load failed: " + e.message
+						print "Data: " + line
+						self.data = []
+						return
 
-		print "Success: %d items loaded in %4.3fs" % (len(self.data), time() - start)
-		self._result = self.data
+			print "Success: %d items loaded in %4.3fs" % (len(self.data), time() - start)
+			self._result = self.data
+		else:
+			print "Load Error.  File doesn't exist."
 
 	# Decorator for pre-query setup
 	def operation(f):
@@ -75,16 +81,43 @@ class Table(object):
 			if len(self.data) > 0:			
 				if self.start_time is None:
 					self._reset()
-				return f(*args, **kwargs)
+				if self._is_fluent:
+					return f(*args, **kwargs)
+				else:
+					f(*args, **kwargs)
 		return new_op
 
 	def _reset(self):
 		self.select_columns = []
 		self.start_time = time()
+		self._show_result = True
+		self._is_fluent = True
 
 		self._result = self.data
 		self.rows_selected = 0
 		self.el_time = 0
+
+	@property
+	def show(self):
+	    return self._show_result
+	@show.setter
+	def show(self, value):
+	    self._show_result = value
+
+	@operation
+	def export(self, file_name):
+		if not os.path.isfile(file_name):
+			with open(file_name,'w') as out:
+				rows_exported = 0
+				if self.start_time is not None:
+					for item in self._result:
+						out.write('%s\n' % json.dumps(item))
+				else:
+					for item in self.data:
+						out.write('%s\n' % json.dumps(item))
+				print "Exported %d rows to: %s." % ( rows_exported, file_name)
+		else:
+			print "Export error: File already exists."
 
 	@operation
 	def desc(self):
@@ -153,8 +186,12 @@ class Table(object):
 		return self
 
 	@operation
-	def count(self, enabled=True):
-		self._result = len(self._result)
+	def count(self, col=None):
+		if col is None:
+			self._result = len(self._result)
+		else:
+			c = len([1 for item in self._result if hasattr(item,col)])
+			self._result = c
 		return self
 
 	@operation
@@ -166,8 +203,8 @@ class Table(object):
 		return self
 
 	@operation
-	def dist(self, prop):
-		self._result = list({item[prop] : item for item in self.data}.values())
+	def distinct(self, prop):
+		self._result = list({item[prop] : item for item in self._result}.values())
 		return self		
 
 	def format_json(self):
@@ -180,15 +217,27 @@ class Table(object):
 			print json.dumps(item, sort_keys=True, indent=4, separators=(',',': '))
 		else:
 			if type(self._result) is list:
-				tbl = PrettyTable(self._result[0].keys())
+				if _prettytable:
+					tbl = PrettyTable(self._result[0].keys())
 
-				for item in self._result:
-					tbl.add_row(item.values())
+					for item in self._result:
+						tbl.add_row(item.values())
 
-				if len(self.select_columns):
-					print tbl.get_string(fields=self.select_columns)
+					if len(self.select_columns) > 0:
+						print tbl.get_string(fields=self.select_columns)
+					else:
+						print tbl
 				else:
-					print tbl
+					if len(self.select_columns) > 0:
+						for col in self.select_columns:
+							print col
+
+						for item in self._result:
+							for col in self.select_columns:
+								print item[col] + '\t'
+					else:
+						for item in self._result:
+							print item.values()
 
 				stats = "Rows: %d" % len(self._result)
 			else:
@@ -197,29 +246,36 @@ class Table(object):
 		print "%s in (%3.3fs)" % (stats, self.el_time)
 
 	@operation
-	def result(self):
+	def result(self, show=True):
 		if type(self._result) is list:
 			# if columns have been selected and the result contains a dictionary
 			if len(self.select_columns) > 0 and type(self._result[0]) is dict:
 				# strip unnecessary columns
 				self._result = [{i:item[i] for i in item if i in self.select_columns} for item in self._result]
 			self.rows_selected = len(self._result)
-		return self._result
-
-	@operation
-	def __call__(self):
-		# Process the final operations
-		self.result()
 		
 		# Calculate processing time and reset
 		self.el_time = time() - self.start_time
 		self.start_time = None
 
 		# Display the Result
-		self._show()
+		if show:
+			self._show()
 
 		# Return the result
 		return self._result
+
+	def __enter__(self):
+		self._reset()
+		self._is_fluent = False
+
+	def __exit__(self, type, value, traceback):
+		return self.result(self._show_result)
+
+	@operation
+	def __call__(self, show=True):
+		# Process the final operations
+		return self.result(show)
 
 if __name__== "__main__":
 	
@@ -237,4 +293,4 @@ if __name__== "__main__":
 
 	# tbl.gt('class_id',1).limit(2).select(['name','paid'])()
 
-	tbl.gt('class_id',1).limit(5).groupby('class_id')()
+	tbl.gt('class_id',1).limit(5).groupby('class_id').distinct('class_id')()
