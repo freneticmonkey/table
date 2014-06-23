@@ -23,7 +23,7 @@ THE SOFTWARE.
 """
 
 # Python Includes
-import json, re, calendar, os, copy
+import json, re, calendar, os, copy, csv
 from time import time
 from datetime import datetime
 from operator import itemgetter
@@ -45,10 +45,16 @@ class Table(object):
 		self.data = []
 		
 		if not input_file is '':
-			self.load(input_file)
+			if input_file.endswith('json'):
+				self.load_json(input_file)
+			elif input_file.endswith('csv'):
+				self.load_csv(input_file)
+			else:
+				print 'Unknown data format: ' + input_file
+
 		self._reset()
 
-	def load(self, file_name):
+	def load_json(self, file_name):
 		if os.path.isfile(file_name):
 			start = time()
 			data = []
@@ -56,6 +62,23 @@ class Table(object):
 				for line in f.readlines():
 					try:
 						data.append(json.loads(line))
+					except Exception, e:
+						print "Load failed: " + e.message
+						print "Data: " + line
+						return
+			self._setdata(data)
+			print "Success: %d items loaded in %4.3fs" % (len(self.data), time() - start)
+		else:
+			print "Load Error.  File doesn't exist."
+
+	def load_csv(self, file_name):
+		if os.path.isfile(file_name):
+			start = time()
+			data = []
+			with csv.DictReader(open(file_name, 'r')) as d:
+				for row in f.readlines():
+					try:
+						data.append(row)
 					except Exception, e:
 						print "Load failed: " + e.message
 						print "Data: " + line
@@ -206,6 +229,7 @@ class Table(object):
 		self._result = list({item[prop] : item for item in self._result}.values())
 		return self
 
+	@operation
 	def join(self, other, column):
 		tmp = Table()
 		tmp.data = []
@@ -220,6 +244,7 @@ class Table(object):
 		tmp._setdata(tmp.data)
 		return tmp
 
+	@operation
 	def rjoin(self, other, column):
 		tmp = Table()
 		tmp.data = []
@@ -310,7 +335,7 @@ class Table(object):
 if __name__== "__main__":
 	
 	students = Table()
-	students.load("students.json")
+	students.load_json("students.json")
 
 	classes = Table("classes.json")
 
