@@ -23,7 +23,7 @@ THE SOFTWARE.
 """
 
 # Python Includes
-import json, re, calendar, os
+import json, re, calendar, os, copy
 from time import time
 from datetime import datetime
 from operator import itemgetter
@@ -49,30 +49,29 @@ class Table(object):
 		self._reset()
 
 	def load(self, file_name):
-		self.data_format = {}
-		self.data = []
-		self.have_format = False
 		if os.path.isfile(file_name):
 			start = time()
+			data = []
 			with open(file_name, 'r') as f:
 				for line in f.readlines():
 					try:
-						row = json.loads(line)
-						self.data.append(row)
-						if not self.have_format:
-							for key, value in row.items():
-								self.data_format[key] = type(value).__name__
-
+						data.append(json.loads(line))
 					except Exception, e:
 						print "Load failed: " + e.message
 						print "Data: " + line
-						self.data = []
 						return
-
+			self._setdata(data)
 			print "Success: %d items loaded in %4.3fs" % (len(self.data), time() - start)
-			self._result = self.data
 		else:
 			print "Load Error.  File doesn't exist."
+
+	def _setdata(self, new_data):
+		self.data_format = {}
+		self.data = new_data
+		self._result = self.data
+
+		if len(self.data) > 0:
+			self.data_format = {key:type(value).__name__ for key, value in self.data[0].items() }
 
 	# Decorator for pre-query setup
 	def operation(f):
@@ -205,7 +204,35 @@ class Table(object):
 	@operation
 	def distinct(self, prop):
 		self._result = list({item[prop] : item for item in self._result}.values())
-		return self		
+		return self
+
+	def join(self, other, column):
+		tmp = Table()
+		tmp.data = []
+
+		for item in self._result:
+			for oitem in other._result:
+				if item[column] == oitem[column]:
+					n_item = copy.copy(item)
+					for key, value in oitem.items():
+						n_item[key+'_'] = value
+					tmp.data.append(n_item)
+		tmp._setdata(tmp.data)
+		return tmp
+
+	def rjoin(self, other, column):
+		tmp = Table()
+		tmp.data = []
+
+		for oitem in other._result:
+			for item in self._result:
+				if item[column] == oitem[column]:
+					n_item = copy.copy(oitem)
+					for key, value in item.items():
+						n_item[key+'_'] = value
+					tmp.data.append(n_item)
+		tmp._setdata(tmp.data)
+		return tmp
 
 	def format_json(self):
 		self.show_json = True
@@ -267,9 +294,12 @@ class Table(object):
 
 	def __enter__(self):
 		self._reset()
+		# Disabling operation returns while in with block
 		self._is_fluent = False
 
 	def __exit__(self, type, value, traceback):
+		# Enabling operation return for final result
+		self._is_fluent = True
 		return self.result(self._show_result)
 
 	@operation
@@ -279,18 +309,23 @@ class Table(object):
 
 if __name__== "__main__":
 	
-	tbl = Table()
-	tbl.load("students.json")
+	students = Table()
+	students.load("students.json")
+
+	classes = Table("classes.json")
 
 	# Verbose operations
-	# tbl.where(lambda i: i['class_id'] > 1).count()()
-	# tbl.where(lambda i: i['paid'] == True).count()()
+	# students.where(lambda i: i['class_id'] > 1).count()()
+	# students.where(lambda i: i['paid'] == True).count()()
 
-	# tbl.gt('class_id',1).count()()
-	# tbl.eq('paid',True).count()()
-	# tbl.isin('class_id',[1,2]).count()()
-	# tbl.like('name','.*n.*').count()()
+	# students.gt('class_id',1).count()()
+	# students.eq('paid',True).count()()
+	# students.isin('class_id',[1,2]).count()()
+	# students.like('name','.*n.*').count()()
 
-	# tbl.gt('class_id',1).limit(2).select(['name','paid'])()
+	# students.gt('class_id',1).limit(2).select(['name','paid'])()
 
-	tbl.gt('class_id',1).limit(5).groupby('class_id').distinct('class_id')()
+	students.gt('class_id',1).limit(5).groupby('class_id').distinct('class_id')()
+
+	# classes which have students who have paid
+	students.join(classes,'class_id').eq('paid',True).distinct('name_')()
