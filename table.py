@@ -38,13 +38,11 @@ except Exception, e:
 	print "Unable to import prettytable. install using 'easy_install prettytable'"
 	print e.message
 
+__version__ = 0.1
+
 class Table(object):
 	"""A very basic tabular data manipulation class
 	
-	If the class has public attributes, they should be documented here
-	in an ``Attributes`` section and follow the same formatting as a
-	function's ``Args`` section.
-
 	Attributes:
 		data (list): Contains a 'list' of dictionaries each of which represents a 'row'
 		_data_format (dict): a dictionary containing the name and format of each field in a 'row' dictionary
