@@ -72,7 +72,8 @@ class Table(object):
 				print 'Unknown data format: ' + input_file
 
 		self._reset()
-	
+		self._start_time = None
+			
 	def _reset(self):
 		"""resets the query state variables"""
 		self._select_columns = []
@@ -193,16 +194,19 @@ class Table(object):
 		"""
 		if not os.path.isfile(file_name):
 			with open(file_name,'w') as out:
-				rows_exported = 0
+				_export_data = None
 				if self._start_time is not None:
-					for item in self._result:
-						out.write('%s\n' % json.dumps(item))
+					_export_data = self._result
 				else:
-					for item in self.data:
-						out.write('%s\n' % json.dumps(item))
-				print "Exported %d rows to: %s." % ( rows_exported, file_name)
+					_export_data = self.data
+
+				for item in _export_data:
+					out.write('%s\n' % json.dumps(item))
+
+				print "Exported %d rows to: %s." % ( len(_export_data), file_name)
 		else:
 			print "Export error: File already exists."
+		return self
 
 	@operation
 	def desc(self):
@@ -419,10 +423,46 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		total = 0
-		for item in self._result:
-			total += item[col]
-		self._result = total
+		self._result = sum([value for item[col] in self._result])
+		return self
+
+	@operation
+	def min(self, col):
+		"""get the minimum value in the column ``col``
+		
+		Keyword arguments:
+		col (str): name of the column on which to calculate the minimum value
+		
+		Returns:
+		object: self for fluent interface
+		"""
+		self._result = min([value for item[col] in self._result])
+		return self
+
+	@operation
+	def max(self, col):
+		"""get the maximum value in the column ``col``
+		
+		Keyword arguments:
+		col (str): name of the column on which to calculate the maximum value
+		
+		Returns:
+		object: self for fluent interface
+		"""
+		self._result = max([value for item[col] in self._result])
+		return self
+
+	@operation
+	def avg(self, col):
+		"""get the average value in the column ``col``
+		
+		Keyword arguments:
+		col (str): name of the column on which to calculate the average value
+		
+		Returns:
+		object: self for fluent interface
+		"""
+		self._result = sum([value for item[col] in self._result]) / len(self._result)
 		return self
 
 	@operation
@@ -439,12 +479,13 @@ class Table(object):
 		return self
 
 	@operation
-	def join(self, other, column):
+	def join(self, other, column, alias="_"):
 		"""join another table instance where the value of the ``column`` column is eqivalent
 		
 		Keyword arguments:
 		other (Table): the Table on which to join
 		column (str): the name of the column on which to join the two tables
+		alias (str): the alias by which the other table can be referred to when referencing its columns
 		
 		Returns:
 		Table: a table instance containing the join result
@@ -457,7 +498,7 @@ class Table(object):
 				if item[column] == oitem[column]:
 					n_item = copy.copy(item)
 					for key, value in oitem.items():
-						n_item[key+'_'] = value
+						n_item["%s.%s" % (alias,key) ] = value
 					tmp.data.append(n_item)
 		tmp._setdata(tmp.data)
 		return tmp
@@ -571,6 +612,7 @@ class Table(object):
 		self._reset()
 		# Disabling operation returns while in with block
 		self._is_fluent = False
+		return self
 
 	def __exit__(self, type, value, traceback):
 		"""handle the end of a with block. 
