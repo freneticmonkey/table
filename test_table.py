@@ -1,25 +1,5 @@
 from table import Table
 
-# with Table('students.json') as t:
-# 	# t.eq('class_id',2)
-# 	# t.eq('paid',True)
-# 	t.orderby('class_id')
-
-# def table_compare(tbl, comp):
-# 	if len(tbl) != len(comp):
-# 		return False
-
-# 	for i in len(tbl):
-# 		trow = tbl[i]
-# 		crow = comp[i]
-# 		if set(trow.keys()) != set(crow.keys()):
-# 			return False
-# 		else:
-# 			for key in trow.keys():
-# 				if trow[key] != comp[key]:
-# 					return False
-# 	return True
-
 def test_load():
 	assert Table("students.json").data != []
 
@@ -141,6 +121,3 @@ def test_compound():
 	classes = Table("classes.json")
 
 	assert students.join(classes,'class_id','c').eq('paid',True).distinct('c.name').count()(False) == 2
-
-# classes which have students who have paid
-#students.join(classes,'class_id','c').eq('paid',True).distinct('c.name').export('paid.json')(False)
