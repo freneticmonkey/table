@@ -406,11 +406,12 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		if col is None:
-			self._result = len(self._result)
-		else:
-			c = len([1 for item in self._result if hasattr(item,col)])
-			self._result = c
+		if isinstance(list, self._result):
+			if col is None:
+				self._result = len(self._result)
+			else:
+				c = len([1 for item in self._result if hasattr(item,col)])
+				self._result = c
 		return self
 
 	@operation
