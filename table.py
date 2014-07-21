@@ -406,7 +406,7 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		if isinstance(list, self._result):
+		if isinstance(self._result, list):
 			if col is None:
 				self._result = len(self._result)
 			else:
@@ -424,7 +424,7 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		self._result = sum([value for item[col] in self._result])
+		self._result = sum([item[col] for item in self._result])
 		return self
 
 	@operation
@@ -437,7 +437,7 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		self._result = min([value for item[col] in self._result])
+		self._result = min([item[col] for item in self._result])
 		return self
 
 	@operation
@@ -450,7 +450,7 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		self._result = max([value for item[col] in self._result])
+		self._result = max([item[col] for item in self._result])
 		return self
 
 	@operation
@@ -463,7 +463,7 @@ class Table(object):
 		Returns:
 		object: self for fluent interface
 		"""
-		self._result = sum([value for item[col] in self._result]) / len(self._result)
+		self._result = sum([item[col] for item in self._result]) / len(self._result)
 		return self
 
 	@operation
@@ -505,12 +505,13 @@ class Table(object):
 		return tmp
 
 	@operation
-	def rjoin(self, other, column):
+	def rjoin(self, other, column, alias="_"):
 		"""join this table to another Table where the value of the ``column`` column is eqivalent
 		
 		Keyword arguments:
 		other (Table): the Table on which to join this table
 		column (str): the name of the column on which to join the two tables
+		alias (str): the alias by which the other table can be referred to when referencing its columns
 		
 		Returns:
 		Table: a table instance containing the join result
@@ -523,7 +524,7 @@ class Table(object):
 				if item[column] == oitem[column]:
 					n_item = copy.copy(oitem)
 					for key, value in item.items():
-						n_item[key+'_'] = value
+						n_item["%s.%s" % (alias,key) ] = value
 					tmp.data.append(n_item)
 		tmp._setdata(tmp.data)
 		return tmp
